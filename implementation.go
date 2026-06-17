@@ -13,11 +13,17 @@ type MyDirectedGraph struct {
 	//für jeden Knoten speichern von einer Liste seiner ausgehenden Kanten
 	adjList map[string][]Edge
 	//für jeden Knoten speichern wir direkt seine Vorgänger-Knoten (also invertiert)
-	invList map[string][]string
+	invList  map[string][]string
+	numEdges int
 }
 
-//Quasi eine Konstruktor Funktion
+type MyUnDirectedGraph struct {
+	vertices map[string]bool
+	adjList  map[string][]Edge
+	numEdges int
+}
 
+//Quasi Konstruktor für gerichteten Graphen
 func NewDirectedAdjacencyList() DirectedGraph {
 	return &MyDirectedGraph{ //&: nicht gesamter Praph zurückgegeben, sondern Pointer auf den Graphen
 		vertices: make(map[string]bool),     //aktiviert die Knotenliste
@@ -25,6 +31,16 @@ func NewDirectedAdjacencyList() DirectedGraph {
 		invList:  make(map[string][]string), //initialisieren der invertierten Liste (Vorgänger)
 	}
 }
+
+//das gleiche für den ungercihteten
+func NewUnDirectedAdjacencyList() UnDirectedGraph {
+	return &MyUnDirectedGraph{
+		vertices: make(map[string]bool),
+		adjList:  make(map[string][]Edge),
+	}
+}
+
+//Implementierung: Gerichteter Graph
 
 //fügt einen Knoten zum Graphen hinzu
 func (g *MyDirectedGraph) AddVertex(nodeId string) {
@@ -41,42 +57,11 @@ func (g *MyDirectedGraph) NumVertices() int {
 	return len(g.vertices) //Länge der vertices Map zurück gegeben
 }
 
-//gerichtete Kanten hinzufügen
-func (g *MyDirectedGraph) AddDirectedEdge(nodeId1, nodeId2 string, length float64) { //von node 1 zu node 2 mit Länge
-	//holen von der aktuellen Kantenliste von Knoten 1 und neue Kante zufügen
-	g.adjList[nodeId1] = append(g.adjList[nodeId1], Edge{To: nodeId2, Length: length})
-
-	//Knoten 1 als Vorgänger von Knoten 2 registrieren
-	g.invList[nodeId2] = append(g.invList[nodeId2], nodeId1)
-}
-
 //Gibt die Anzahl der Kanten in dem Graphen zurück
 func (g *MyDirectedGraph) NumEdges() int {
-	count := 0
 	//durch alle Kantenlisten im Graphen laufen
-	for _, edges := range g.adjList {
-		count += len(edges) //Anzahl der Kanten addieren
-	}
-	return count
-}
-
-//Gibt die Nachfolger eines Knotens aus
-func (g *MyDirectedGraph) Successors(nodeId string) []string {
-	edges := g.adjList[nodeId]
-	list := make([]string, len(edges))
-
-	//aus jeder Kante das Ziel (also to) heraus holen
-	for i, edge := range edges {
-		list[i] = edge.To
-	}
-	return list
-}
-
-//Gibt die Vorgänger eines Knotens aus
-func (g *MyDirectedGraph) Predecessors(nodeId string) []string {
-	//man muss den ganzen Graphen nicht immer wieder nach passenden Knoten durchsuchen,
-	//denn die Vorgänger wurden ja schon in einer Liste gespeichert
-	return g.invList[nodeId]
+	//Anzahl der Kanten addieren
+	return g.numEdges
 }
 
 //Breadth-First Search
@@ -104,10 +89,11 @@ func (g *MyDirectedGraph) BFS(nodeId string) map[string]int {
 		currentDist := distances[current]
 
 		//alle Nachfolger des aktuellen Knotens untersuchen
-		for _, successor := range g.Successors(current) {
+		for _, edge := range g.adjList[current] {
+			successor := edge.To
 			//wenn der Nachfolger noch keine Distanz hat, wurde er noch nicht besucht
 			if _, visited := distances[successor]; !visited {
-				//Distanz ist die Entfernung des aktuellen Knotens + 1
+				//Distanz ist die Antwort des aktuellen Knotens + 1
 				distances[successor] = currentDist + 1
 				//Nachfolger in die Queue packen, um später dessen Nachbarn zu prüfen
 				q.Enqueue(successor)
@@ -141,7 +127,8 @@ func (g *MyDirectedGraph) dfsHelper(current string, visited map[string]bool) {
 	visited[current] = true
 
 	//alle Nachfolger ansehen
-	for _, successor := range g.Successors(current) {
+	for _, edge := range g.adjList[current] {
+		successor := edge.To
 		//wenn Nachfolger noch nicht besucht wurde
 		if !visited[successor] {
 			//dann hier rekursiv ansetzen usw.
@@ -150,8 +137,27 @@ func (g *MyDirectedGraph) dfsHelper(current string, visited map[string]bool) {
 	}
 }
 
+//Gibt die Vorgänger eines Knotens aus
+func (g *MyDirectedGraph) Predecessors(nodeId string) []string {
+	//man muss den ganzen Graphen nicht immer wieder nach passenden Knoten durchsuchen,
+	//denn die Vorgänger wurden ja schon in einer Liste gespeichert
+	return g.invList[nodeId]
+}
+
+//Gibt die Nachfolger eines Knotens aus
+func (g *MyDirectedGraph) Successors(nodeId string) []string {
+	edges := g.adjList[nodeId]
+	list := make([]string, len(edges))
+
+	//aus jeder Kante das Ziel (also to) heraus holen
+	for i, edge := range edges {
+		list[i] = edge.To
+	}
+	return list
+}
+
 //Shortest-Path Algorithm
-//findet den kürzesten Pfad zu einem Knoten in einem gewichteten Graphen
+//findet den kürzesten Pfad zu einem Knoten in einem Graphen
 func (g *MyDirectedGraph) Dijkstra(id string) map[string]float64 {
 	distances := make(map[string]float64)
 
@@ -205,4 +211,122 @@ func (g *MyDirectedGraph) Dijkstra(id string) map[string]float64 {
 	}
 
 	return distances //Distanzen wiedergeben
+}
+
+//gerichtete Kanten hinzufügen
+func (g *MyDirectedGraph) AddDirectedEdge(nodeId1, nodeId2 string, length float64) { //von node 1 zu node 2 mit Länge
+	//holen von der aktuellen Kantenliste von Knoten 1 und neue Kante zufügen
+	g.adjList[nodeId1] = append(g.adjList[nodeId1], Edge{To: nodeId2, Length: length})
+
+	//Knoten 1 als Vorgänger von Knoten 2 registrieren
+	g.invList[nodeId2] = append(g.invList[nodeId2], nodeId1)
+	g.numEdges++
+}
+
+//Implementierung: Ungerichteter Graph
+
+//Knoten zufügen
+func (g *MyUnDirectedGraph) AddVertex(nodeId string) {
+	if _, exists := g.vertices[nodeId]; !exists {
+		g.vertices[nodeId] = true
+		g.adjList[nodeId] = []Edge{}
+	}
+}
+
+//Anzahl Knoten
+func (g *MyUnDirectedGraph) NumVertices() int {
+	return len(g.vertices)
+}
+
+//Anzahl Kanten
+func (g *MyUnDirectedGraph) NumEdges() int {
+	return g.numEdges
+}
+
+//Breadth-First Search
+func (g *MyUnDirectedGraph) BFS(nodeId string) map[string]int {
+	distances := make(map[string]int)
+	if !g.vertices[nodeId] {
+		return distances
+	}
+
+	q := NewQueue()
+	distances[nodeId] = 0
+	q.Enqueue(nodeId)
+
+	for !q.IsEmpty() {
+		current, _ := q.Dequeue()
+		currentDist := distances[current]
+
+		for _, edge := range g.adjList[current] {
+			neighbor := edge.To
+			if _, visited := distances[neighbor]; !visited {
+				distances[neighbor] = currentDist + 1
+				q.Enqueue(neighbor)
+			}
+		}
+	}
+	return distances
+}
+
+//Depth-First Search
+func (g *MyUnDirectedGraph) DFS(nodeId string) map[string]bool {
+	visited := make(map[string]bool)
+	if !g.vertices[nodeId] {
+		return visited
+	}
+	g.dfsHelper(nodeId, visited)
+	return visited
+}
+
+//macht wieder die Rekursion von dfs
+func (g *MyUnDirectedGraph) dfsHelper(current string, visited map[string]bool) {
+	visited[current] = true
+	for _, edge := range g.adjList[current] {
+		neighbor := edge.To
+		if !visited[neighbor] {
+			g.dfsHelper(neighbor, visited)
+		}
+	}
+}
+
+//ungerichtete Kante zufügen
+func (g *MyUnDirectedGraph) AddUndirectedEdge(nodeId1, nodeId2 string, length float64) {
+	g.adjList[nodeId1] = append(g.adjList[nodeId1], Edge{To: nodeId2, Length: length})
+	g.adjList[nodeId2] = append(g.adjList[nodeId2], Edge{To: nodeId1, Length: length})
+	g.numEdges++
+}
+
+//gibt alle Nachbarknoten eines Knotens wieder
+func (g *MyUnDirectedGraph) Neighbors(nodeId string) []string {
+	edges := g.adjList[nodeId]
+	list := make([]string, len(edges))
+	for i, edge := range edges {
+		list[i] = edge.To
+	}
+	return list
+}
+
+//findet alle zusammenhängenden Komponenten
+func (g *MyUnDirectedGraph) UCC() map[string]int {
+	componentMap := make(map[string]int)
+	currentComponentID := 1
+
+	for vertex := range g.vertices {
+		if _, visited := componentMap[vertex]; !visited {
+			g.uccHelper(vertex, currentComponentID, componentMap)
+			currentComponentID++
+		}
+	}
+	return componentMap
+}
+
+func (g *MyUnDirectedGraph) uccHelper(current string, id int, componentMap map[string]int) {
+	componentMap[current] = id
+	for _, edge := range g.adjList[current] {
+		neighbor := edge.To
+		if _, visited := componentMap[neighbor]; !visited {
+			g.uccHelper(neighbor, id, componentMap)
+		}
+	}
 }
